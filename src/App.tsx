@@ -3,17 +3,27 @@ import ExecutiveForm from "./Components/ExecutiveBriefForm";
 import LoginForm from "./Components/Login";
 import { Toaster } from "sonner";
 
-const isAuthenticated = () => {
-  const token = localStorage.getItem("accessToken");
-  const user = localStorage.getItem("user");
-  return !!token && !!user;
-};
+// const isAuthenticated = () => {
+//   const token = localStorage.getItem("accessToken");
+//   const user = localStorage.getItem("user");
+//   return !!token && !!user;
+// };
+
+// const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+//   const token = localStorage.getItem("accessToken");
+//   const user = localStorage.getItem("user");
+
+//   if (!token || !user) {
+//     return <Navigate to="/login" replace />;
+//   }
+
+//   return children;
+// };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const token = localStorage.getItem("accessToken");
   const user = localStorage.getItem("user");
 
-  if (!token || !user) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 

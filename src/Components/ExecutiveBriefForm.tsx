@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Box, TextField, Button, MenuItem, Select, InputLabel, FormControl, Typography, } from "@mui/material";
 import { toast } from "sonner";
 import { Toaster } from "sonner";
+import axios from "axios";
 
 
 const ExecutiveForm = () => {
@@ -48,42 +49,56 @@ const ExecutiveForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const fetchCampaigns = async () => {
-  try {
-    const token = localStorage.getItem("accessToken");
 
+
+
+const fetchCampaigns = async () => {
+  try {
     const res = await fetch(`${BASE_URL}/board/campaigns/`, {
+      method: "GET",
+      credentials: "include",
       headers: {
-        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
     });
-    if (res.status === 401) {
-      console.log("Token invalid or expired");
-      localStorage.clear();
-      window.location.href = "/login";
 
-      return;
-    }
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData?.message || "Something went wrong");
-    }
+    console.log("Campaign API Status:", res.status);
+
+
+    // if (res.status === 401) {
+    //   console.log("401 detected");
+    //   localStorage.removeItem("user");
+    //   window.location.href = "/login";
+    //   return;
+    // }
+
+
     const data = await res.json();
+    console.log("Campaign Data:", data);
+
     setCampaigns(data);
-
-  } catch (err: any) {
-    console.error("Error fetching campaigns:", err.message);
-
+  } catch (err) {
+    console.error(err);
   }
 };
 
+
+
+
+
+
   const fetchEvents = async (campaignId: string) => {
     try {
-      const token = localStorage.getItem("accessToken");
+     
       const res = await fetch(
         `${BASE_URL}/board/campaigns/${campaignId}/events/`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          method: "GET",
+          credentials: "include",
+          // headers: { Authorization: `Bearer ${token}` },
+           headers: {
+        "Content-Type": "application/json",
+      },
         }
       );
       const data = await res.json();
@@ -94,11 +109,16 @@ const ExecutiveForm = () => {
     }
   };
 
+
   const fetchSME = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
       const res = await fetch(`${BASE_URL}/content/contents/sme`, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: "GET",
+        credentials: "include",
+        //  headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
       const data = await res.json();
       setSmeList(data);
@@ -109,20 +129,26 @@ const ExecutiveForm = () => {
     }
   }
 
+
   const createContent = async () => {
-    if (!validateForm()) return;
+  // Form validation
+  if (!validateForm()) return;
 
-    setLoading(true); 
+  setLoading(true);
 
-    try {
-      const token = localStorage.getItem("accessToken");
-
-      const res = await fetch(`${BASE_URL}/content/contents/initiate/`, {
+  try {
+    const res = await fetch(
+      `${BASE_URL}/content/contents/initiate/`,
+      {
         method: "POST",
+
+        // IMPORTANT for HttpOnly cookies
+        credentials: "include",
+
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           title,
           brief,
@@ -131,34 +157,63 @@ const ExecutiveForm = () => {
           event_id: eventId,
           sme_id: smeId,
         }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data?.error || "Something went wrong ");
-        return;
       }
+    );
 
-      toast.success("Content brief created successfully");
+    // Handle unauthorized user
+    if (res.status === 401) {
+      toast.error("Session expired. Please login again.");
 
-      setTitle("");
-      setBrief("");
-      setContentType("");
-      setCampaignId("");
-      setEventId("");
-      //setTags("");
-      setSmeId("");
+      // Remove local user info only
+      localStorage.removeItem("user");
 
-    } catch (err) {
-      console.error(err);
-      toast.error("Server error ");
-    } finally {
-      setLoading(false);
+      // Redirect to login
+      window.location.href = "/login";
+
+      return;
     }
-  };
+
+    // Parse response safely
+    let data;
+
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error("Invalid server response");
+    }
+
+    // Handle API errors
+    if (!res.ok) {
+      toast.error(data?.error || data?.message || "Something went wrong");
+      return;
+    }
+
+    // Success
+    toast.success("Content brief created successfully");
+
+    // Reset form
+    setTitle("");
+    setBrief("");
+    setContentType("");
+    setCampaignId("");
+    setEventId("");
+    setSmeId("");
+
+  } catch (err) {
+    console.error("Create Content Error:", err);
+
+    if (err instanceof TypeError) {
+      toast.error("Network/CORS error");
+    } else {
+      toast.error("Server error");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
+     console.log("ExecutiveForm Mounted");
     fetchCampaigns();
     fetchSME();
   }, []);

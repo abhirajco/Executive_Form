@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { BASE_URL } from "../utils/BASE_URL";
+import axios from "axios";
 //import { TextFieldProps } from "@mui/material";
 
 const LoginForm = () => {
@@ -16,81 +17,189 @@ const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  // const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault();
 
-    if (!email.trim()) {
-      setError("Email is required");
-      return;
-    }
+  //   if (!email.trim()) {
+  //     setError("Email is required");
+  //     return;
+  //   }
 
-    if (!password.trim()) {
-      setError("Password is required");
-      return;
-    }
+  //   if (!password.trim()) {
+  //     setError("Password is required");
+  //     return;
+  //   }
 
-    setIsLoading(true);
-    setError("");
+  //   setIsLoading(true);
+  //   setError("");
+
+  //   try {
+  //     const response = await fetch(`${BASE_URL}/accounts/login/`, {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ email, password }),
+  //     });
+
+  //     const data = await response.json();
+
+  //     console.log("Login Response:", data);
+
+  //     //  validation errors from backend
+  //     if (Array.isArray(data)) {
+  //       setError(data[0]);
+  //       setIsLoading(false);
+  //       return;
+  //     }
+
+  //     //  invalid credentials
+  //     if (!data.access) {
+  //       setError("Invalid email or password");
+  //       setIsLoading(false);
+  //       return;
+  //     }
+
+  //     //  store tokens
+  //     localStorage.setItem("accessToken", data.access);
+  //     localStorage.setItem("refreshToken", data.refresh);
+
+  //     //  store user data
+  //     if (data.user) {
+  //       const userData =
+  //       {
+  //         full_name: data.user.full_name,
+  //         email: data.user.email,
+  //         role: data.user.role,
+  //       };
+
+  //       localStorage.setItem("user", JSON.stringify(userData));
+  //     }
+
+  //     if (data.user?.role !== "exec_approver") {
+  //       setError("Only executives can Login to this form");
+  //       localStorage.clear(); // important for security
+  //       setIsLoading(false);
+  //       return;
+  //     }
+
+  //     navigate("/executive-form");
+
+  //   } catch (err) {
+  //     setError("Server error. Please try again.");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
+
+  type User = {
+  id: string;
+  email: string;
+  full_name: string;
+  group: string;
+  role: string;
+};
+
+const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+
+  // Reset errors
+  setError("");
+
+  // Validation
+  if (!email.trim()) {
+    setError("Email is required");
+    return;
+  }
+
+  if (!password.trim()) {
+    setError("Password is required");
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const response = await fetch(`${BASE_URL}/accounts/login/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      // Required for HttpOnly cookies
+      credentials: "include",
+
+      body: JSON.stringify({
+        email: email.trim(),
+        password,
+      }),
+    });
+
+    let data;
 
     try {
-      const response = await fetch(`${BASE_URL}/accounts/login/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      console.log("Login Response:", data);
-
-      //  validation errors from backend
-      if (Array.isArray(data)) {
-        setError(data[0]);
-        setIsLoading(false);
-        return;
-      }
-
-      //  invalid credentials
-      if (!data.access) {
-        setError("Invalid email or password");
-        setIsLoading(false);
-        return;
-      }
-
-      //  store tokens
-      localStorage.setItem("accessToken", data.access);
-      localStorage.setItem("refreshToken", data.refresh);
-
-      //  store user data
-      if (data.user) {
-        const userData =
-        {
-          full_name: data.user.full_name,
-          email: data.user.email,
-          role: data.user.role,
-        };
-
-        localStorage.setItem("user", JSON.stringify(userData));
-      }
-
-      if (data.user?.role !== "exec_approver") {
-        setError("Only executives can Login to this form");
-        localStorage.clear(); // important for security
-        setIsLoading(false);
-        return;
-      }
-
-      navigate("/executive-form");
-
-    } catch (err) {
-      setError("Server error. Please try again.");
-    } finally {
-      setIsLoading(false);
+      data = await response.json();
+    } catch {
+      throw new Error("Invalid server response");
     }
-  };
 
+    console.log("Login Response:", data);
+
+    // Backend validation errors
+    if (Array.isArray(data)) {
+      setError(data[0]);
+      return;
+    }
+
+    if (!response.ok) {
+      setError(data?.message || "Login failed");
+      return;
+    }
+
+    if (!data?.user) {
+      setError("User data not found");
+      return;
+    }
+
+    
+    // if (data.user.role !== "exec_approver") {
+    //   setError("Only executives can login to this form");
+    //   return;
+    // }
+
+    if ( data.user.role !== "exec_approver" && data.user.role !== "admin")
+{
+ setError("Unauthorized user");
+  return;
+}
+
+    
+    const userData: User = {
+      id: data.user.id,
+      email: data.user.email,
+      full_name: data.user.full_name,
+      group: data.user.group,
+      role: data.user.role,
+    };
+
+    localStorage.setItem("user", JSON.stringify(userData));
+console.log("Navigating...");
+    navigate("/executive-form");
+
+  } catch (error)
+  {
+    console.error("Login Error:", error);
+
+    if (error instanceof TypeError) {
+      setError("Network error. Please check your internet connection.");
+    } else {
+      setError("Something went wrong. Please try again.");
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
 
 
   return (
@@ -246,6 +355,6 @@ const LoginForm = () => {
       </Box>
     </Box>
   );
-}
+};
 
 export default LoginForm;
